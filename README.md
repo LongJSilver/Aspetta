@@ -74,6 +74,15 @@ var delay = Defer
 
 ## 📦 Install
 
-Coming soon to NuGet:
+Available on NuGet:
 ```sh
 dotnet add package Aspetta
+```
+
+## 📜 License and credits
+
+**Aspetta**  is released under Apache 2.0
+
+The project icon (also used for the NuGet package) was designed by [Freepik](https://www.flaticon.com/authors/freepik)
+
+Contributions are welcome.

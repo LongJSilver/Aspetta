@@ -33,17 +33,17 @@ public class Defer : IDisposable
     // ****************** STATE ****************** //
 
     private TimeSpan _delay;
-    private uint _executionCount = 0;
-    private int _debouncedEvents = 0;
+    private uint _executionCount;
+    private int _debouncedEvents;
     private long _nextExecution = Int64.MaxValue;
     private long _executionLimit = Int64.MaxValue;
-    private bool _canceled = false;
-    private bool _paused = false;
-    private volatile bool _destroyed = false;
+    private bool _canceled;
+    private bool _paused;
+    private volatile bool _destroyed;
 
     // ****************** PUBLIC API ****************** //
 
-    public readonly string? Name;
+    public string? Name { get; private set; }
 
     public TimeSpan Delay
     {

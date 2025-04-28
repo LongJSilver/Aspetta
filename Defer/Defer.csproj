@@ -4,6 +4,54 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>10.0</LangVersion>
     <Nullable>enable</Nullable>
+    <AssemblyName>Aspetta</AssemblyName>
+    <BaseVersion>0.9.0-Alpha</BaseVersion>
   </PropertyGroup>
 
+  <ItemGroup>
+    <None Include="..\Icon.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.0" PrivateAssets="All" />
+  </ItemGroup>
+  
+  <PropertyGroup>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>Aspetta</PackageId>
+    <Version>$(BaseVersion)</Version>
+    <Authors>Marco Perna</Authors>
+    <Description>A minimal .NET micro-library for debouncing and coalescing frequent triggers</Description>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <IncludeSource>true</IncludeSource>
+    <IncludeSymbols>true</IncludeSymbols>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <RepositoryUrl>https://github.com/LongJSilver/Aspetta</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl> true </PublishRepositoryUrl>
+    
+    <Company />
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <EnableNETAnalyzers>True</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <Deterministic>true</Deterministic>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/LongJSilver/Aspetta</PackageProjectUrl>
+    <PackageIcon>Icon.png</PackageIcon>
+  </PropertyGroup>
+  
+  <!-- Add a conditional property for Debug builds -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <Version>$(BaseVersion)-debug</Version>
+  </PropertyGroup>
+  
 </Project>

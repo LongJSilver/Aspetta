@@ -24,9 +24,9 @@ public class DeferBuilder
         return this;
     }
 
-    public DeferBuilder ForAtLeast(uint delay_milliseconds)
+    public DeferBuilder ForAtLeast(uint delayMilliseconds)
     {
-        _delay = TimeSpan.FromMilliseconds(delay_milliseconds);
+        _delay = TimeSpan.FromMilliseconds(delayMilliseconds);
         return this;
     }
 
