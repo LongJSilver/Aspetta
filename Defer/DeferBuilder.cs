@@ -9,7 +9,7 @@ public class DeferBuilder
     private TimeSpan? _delay;
     private uint? _maximumDelaySpan;
     private uint? _maximumTriggerCount;
-    private Action? _exec;
+    private DeferCancellableAction? _cancelableExec;
     private Action<Exception>? _onError;
     private readonly TaskFactory? _taskFactory;
 
@@ -48,9 +48,15 @@ public class DeferBuilder
         return this;
     }
 
-    public DeferBuilder ToExecute(Action exec)
+    public DeferBuilder ToExecute(DeferAction exec)
     {
-        _exec = exec;
+        _cancelableExec = new CancellableActionAdapter(exec).Execute;
+        return this;
+    }
+
+    public DeferBuilder ToExecute(DeferCancellableAction exec)
+    {
+        _cancelableExec = exec;
         return this;
     }
 
@@ -62,7 +68,7 @@ public class DeferBuilder
 
     public Defer Build()
     {
-        if (_exec == null)
+        if (_cancelableExec == null)
             throw new InvalidOperationException("Execution action must be specified.");
         if (_delay == null)
             throw new InvalidOperationException("A positive delay must be specified.");
@@ -70,7 +76,7 @@ public class DeferBuilder
         var defer = new Defer(
             _name,
             _delay.Value,
-            _exec,
+            _cancelableExec,
             _taskFactory,
             _onError
         );

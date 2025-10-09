@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Schema;
 
 namespace Some.Restraint;
 
@@ -12,7 +11,8 @@ public class Defer : IDisposable
 
     // ************ PUBLIC Builder API *********** //
 
-    public static DeferBuilder ToExecute(Action act) => UsingTask().ToExecute(act);
+    public static DeferBuilder ToExecute(DeferAction act) => UsingTask().ToExecute(act);
+    public static DeferBuilder ToExecute(DeferCancellableAction act) => UsingTask().ToExecute(act);
     public static DeferBuilder UsingTask(TaskFactory? t = null) => new DeferBuilder(t ?? Task.Factory);
     public static DeferBuilder UsingDedicatedThread() => new DeferBuilder(null);
 
@@ -20,8 +20,8 @@ public class Defer : IDisposable
 
     private readonly Thread? _thread;
     private readonly Task? _task;
-
-    private readonly Action _exec;
+    private CancellationTokenSource? _CurrentCancellation;
+    private readonly DeferCancellableAction _exec;
     private readonly Action<Exception>? _doOnError;
 
     private readonly Stopwatch _timer;
@@ -109,25 +109,31 @@ public class Defer : IDisposable
         }
     }
 
-    public void CancelPending()
+    public void CancelPending() => Cancel(CancelType.PendingExecution);
+    public void CancelExecuting() => Cancel(CancelType.CurrentlyExecuting);
+    public void Cancel(CancelType type = CancelType.All)
     {
         if (_destroyed)
             throw new ObjectDisposedException(nameof(Defer));
         lock (this._lock)
         {
-            if (this._debouncedEvents > 0)
-            {
-                this._canceled = true;
-                _signal.Set();
-            }
+            if (type.HasFlag(CancelType.CurrentlyExecuting))
+                _CurrentCancellation?.Cancel();
+
+            if (type.HasFlag(CancelType.PendingExecution))
+                if (this._debouncedEvents > 0)
+                {
+                    this._canceled = true;
+                    _signal.Set();
+                }
         }
     }
 
     [DebuggerStepThrough]
     public void Trigger(int overrideInterval) => Trigger((uint)Math.Max(overrideInterval, ABSOLUTE_MINIMUM_DELAY));
     [DebuggerStepThrough]
-    public void Trigger(uint overrideInterval = ABSOLUTE_MINIMUM_DELAY) => Trigger(TimeSpan.FromMilliseconds(overrideInterval));
-    public void Trigger(TimeSpan? overrideInterval)
+    public void Trigger(uint overrideInterval) => Trigger(TimeSpan.FromMilliseconds(overrideInterval));
+    public void Trigger(TimeSpan? overrideInterval = null)
     {
         if (_destroyed)
             throw new ObjectDisposedException(nameof(Defer));
@@ -248,7 +254,7 @@ public class Defer : IDisposable
 
     // ****************** INTERNAL WORK ****************** //
 
-    internal Defer(string? name, TimeSpan delay, Action exec, TaskFactory? taskFactory, Action<Exception>? onError = null)
+    internal Defer(string? name, TimeSpan delay, DeferCancellableAction exec, TaskFactory? taskFactory, Action<Exception>? onError = null)
     {
         this.Name = name;
         this._delay = delay;
@@ -291,7 +297,9 @@ public class Defer : IDisposable
                 if (now >= this._nextExecution)
                 {
                     //should execute?
+
                     execute = !this._canceled & !this._paused;
+                    if (execute) _CurrentCancellation = new CancellationTokenSource();
                     // setup long sleep time
                     this._canceled = false;
                     this._nextExecution = Int64.MaxValue;
@@ -310,7 +318,7 @@ public class Defer : IDisposable
             {
                 try
                 {
-                    this._exec();
+                    this._exec(this._CurrentCancellation!.Token);
                     _executionCount++;
 
                     lock (this._waitingObjectsMonitor)
@@ -328,6 +336,8 @@ public class Defer : IDisposable
             _signal.Reset();
             lock (this._lock)
             {
+                _CurrentCancellation?.Dispose();
+                _CurrentCancellation = null;
                 now = _timer.ElapsedMilliseconds;
                 sleepFor = Math.Min(Int32.MaxValue, this._nextExecution - now);
             }

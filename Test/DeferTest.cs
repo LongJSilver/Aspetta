@@ -5,29 +5,112 @@ namespace Trigger.Delay.Tests
 {
     public class DelayerTest_UsingTask : TriggerDelayTest
     {
-        protected override DeferBuilder BuildDelayer(uint delayMS, Action action)
+        protected override DeferBuilder GetBuilder(uint delayMS, DeferCancellableAction action)
         => Defer.UsingTask().ToExecute(action).ForAtLeast(delayMS).Named("TestDelayer_UsingTask");
     }
 
     public class DelayerTest_UsingThread : TriggerDelayTest
     {
-        protected override DeferBuilder BuildDelayer(uint delayMS, Action action)
+        protected override DeferBuilder GetBuilder(uint delayMS, DeferCancellableAction action)
         => Defer.UsingDedicatedThread().ToExecute(action).ForAtLeast(delayMS).Named("TestDelayer_UsingThread");
     }
 
     public abstract class TriggerDelayTest
     {
-        protected abstract DeferBuilder BuildDelayer(uint delayMS, Action action);
+        protected abstract DeferBuilder GetBuilder(uint delayMS, DeferCancellableAction action);
+        private DeferBuilder GetBuilder(uint delayMS, DeferAction action) => GetBuilder(delayMS, new DeferCancellableAction((ct) => action()));
 
-        private Defer CreateDeferrer(uint delayMS, Action action)
-        => BuildDelayer(delayMS, action).Build();
+        private Defer GetDeferrer(uint delayMS, DeferAction action) => GetDeferrer(delayMS, new DeferCancellableAction((ct) => action()));
+        private Defer GetDeferrer(uint delayMS, DeferCancellableAction action)
+        => GetBuilder(delayMS, action).Build();
+
+        [Fact]
+        public void CancelPendingTest()
+        {
+            // Arrange
+            int executionCount = 0;
+            var LongAction = new DeferAction(() =>
+            {
+                Interlocked.Increment(ref executionCount);
+            });
+
+            var delayer = GetDeferrer(1000, LongAction);
+            // Act
+            delayer.Trigger();
+            Thread.Sleep(100); // Wait to ensure action is not executed
+            delayer.CancelPending();
+            Thread.Sleep(1000); // Wait to ensure action is not executed
+            // Assert
+            Assert.Equal(0, executionCount);
+        }
+
+        [Fact]
+        public void CancelExecutingTest()
+        {
+            // Arrange
+            int executionCount = 0;
+            var LongAction = new DeferCancellableAction((CancellationToken token) =>
+            {
+                Thread.Sleep(1000); // Wait to ensure action is not executed
+                if (token.IsCancellationRequested)
+                    return;
+                Interlocked.Increment(ref executionCount);
+            });
+
+            var delayer = GetDeferrer(1000, LongAction);
+            // Act
+            delayer.Trigger();
+            Thread.Sleep(100); // Wait a bit
+            delayer.CancelExecuting();
+            // Assert
+            Assert.Equal(0, executionCount);
+        }
+
+        [Fact]
+        public void CancelPending_DuringExecution_Should_Not_Affect_CurrentExecution()
+        {
+            // Arrange
+            int executionCount = 0;
+            var LongAction = new DeferAction(() =>
+            {
+                Thread.Sleep(1000); // Simulate long-running action
+                Interlocked.Increment(ref executionCount);
+            });
+            var delayer = GetDeferrer(100, LongAction);
+            // Act
+            delayer.Trigger();
+            Thread.Sleep(200); // Wait for the action to start executing
+            delayer.CancelPending(); // Attempt to cancel while executing
+            Thread.Sleep(1200); // Wait to ensure action has time to complete
+            // Assert
+            Assert.Equal(1, executionCount); // The action should have executed once
+        }
+
+        [Fact]
+        public void CancelExecuting_WhilePending_Should_Not_Cancel_Pending()
+        {
+            // Arrange
+            int executionCount = 0;
+            var LongAction = new DeferAction(() =>
+            {
+                Interlocked.Increment(ref executionCount);
+            });
+            var delayer = GetDeferrer(1000, LongAction);
+            // Act
+            delayer.Trigger();
+            Thread.Sleep(200); // Wait a bit
+            delayer.CancelExecuting(); // Attempt to cancel execution while pending
+            Thread.Sleep(1200); // Wait to ensure action has time to complete
+            // Assert
+            Assert.Equal(1, executionCount); // The action should have executed once
+        }
 
         [Fact]
         public void Delayer_Should_Debounce_Multiple_Triggers()
         {
             // Arrange
             int executionCount = 0;
-            var delayer = CreateDeferrer(100, () => executionCount++);
+            var delayer = GetDeferrer(100, () => executionCount++);
 
             // Act
             delayer.Trigger();
@@ -83,14 +166,14 @@ namespace Trigger.Delay.Tests
             }
             mean /= tries;
 
-            Assert.InRange(delayMS+mean, delayMS - toleranceMS, delayMS + toleranceMS);
+            Assert.InRange(delayMS + mean, delayMS - toleranceMS, delayMS + toleranceMS);
         }
 
         public float ExecutionTimeTest(uint delayMS = 100)
         {
             // Arrange
             var stopwatch = new Stopwatch();
-            var delayer = CreateDeferrer(delayMS, () =>
+            var delayer = GetDeferrer(delayMS, () =>
             {
                 stopwatch.Stop(); // Stop the measurement when the action starts executing
             });
@@ -118,7 +201,7 @@ namespace Trigger.Delay.Tests
         {
             // Arrange
             bool actionExecuted = false;
-            var delayer = CreateDeferrer(100, () => actionExecuted = true);
+            var delayer = GetDeferrer(100, () => actionExecuted = true);
 
             // Act
             delayer.Trigger();
@@ -133,7 +216,7 @@ namespace Trigger.Delay.Tests
         {
             // Arrange
             bool actionExecuted = false;
-            var delayer = CreateDeferrer(100, () => actionExecuted = true);
+            var delayer = GetDeferrer(100, () => actionExecuted = true);
 
             // Act
             delayer.Trigger();
@@ -149,7 +232,7 @@ namespace Trigger.Delay.Tests
         {
             // Arrange
             bool actionExecuted = false;
-            var delayer = CreateDeferrer(100, () => actionExecuted = true);
+            var delayer = GetDeferrer(100, () => actionExecuted = true);
 
             // Act
             delayer.Trigger();
@@ -174,7 +257,7 @@ namespace Trigger.Delay.Tests
             bool actionExecuted = false;
             Stopwatch st = Stopwatch.StartNew();
             const int Delay = 100;
-            var delayer = CreateDeferrer(Delay, () => { st.Stop(); actionExecuted = true; });
+            var delayer = GetDeferrer(Delay, () => { st.Stop(); actionExecuted = true; });
 
             // Act
             delayer.ExecuteNow();
@@ -192,7 +275,7 @@ namespace Trigger.Delay.Tests
             bool actionExecuted = false;
             const int Delay = 100;
             Stopwatch st = Stopwatch.StartNew();
-            var delayer = CreateDeferrer(Delay, () => { st.Stop(); actionExecuted = true; });
+            var delayer = GetDeferrer(Delay, () => { st.Stop(); actionExecuted = true; });
 
             // Act
             delayer.ExecuteNowAndWait();
@@ -207,7 +290,7 @@ namespace Trigger.Delay.Tests
         {
             // Arrange
             bool actionExecuted = false;
-            var delayer = BuildDelayer(100, () => actionExecuted = true)
+            var delayer = GetBuilder(100, () => actionExecuted = true)
                 .WithMaximumDelay(200).Build();
 
             // Act
@@ -223,7 +306,7 @@ namespace Trigger.Delay.Tests
         {
             // Arrange
             bool actionExecuted = false;
-            var delayer = BuildDelayer(100, () => actionExecuted = true)
+            var delayer = GetBuilder(100, () => actionExecuted = true)
                 .WithMaximumTriggerLimit(2).Build();
 
             // Act
