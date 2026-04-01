@@ -5,7 +5,7 @@
     <LangVersion>10.0</LangVersion>
     <Nullable>enable</Nullable>
     <AssemblyName>Aspetta</AssemblyName>
-    <BaseVersion>1.0.0-beta</BaseVersion>
+    <BaseVersion>1.0.1-beta</BaseVersion>
     <DefaultNamespace>Some.Restraint</DefaultNamespace>
   </PropertyGroup>
 

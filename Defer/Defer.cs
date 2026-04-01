@@ -187,17 +187,10 @@ public class Defer : IDisposable
         if (_destroyed) return;
         uint current = _executionCount;
         Trigger(interval);
-        await Task.Run(() =>
+        while (current == _executionCount)
         {
-            lock (_waitingObjectsMonitor)
-            {
-                while (current == _executionCount)
-                {
-                    Monitor.Wait(this._waitingObjectsMonitor);
-                }
-            }
+            await AsyncMonitor.WaitAsync(this._waitingObjectsMonitor);
         }
-         );
     }
 
     public void ExecuteNow()
@@ -219,17 +212,11 @@ public class Defer : IDisposable
         if (_destroyed) return;
         UInt32 current = _executionCount;
         this.ExecuteNow();
-        await Task.Run(() =>
+        while (current == _executionCount)
         {
-            lock (_waitingObjectsMonitor)
-            {
-                while (current == _executionCount)
-                {
-                    Monitor.Wait(this._waitingObjectsMonitor);
-                }
-            }
+            await AsyncMonitor.WaitAsync(this._waitingObjectsMonitor);
         }
-         );
+
     }
 
     public void WaitForNextExecution() => WaitForNextExecutionAsync().Wait();
@@ -238,17 +225,7 @@ public class Defer : IDisposable
     {
         if (_destroyed) return;
         uint current = _executionCount;
-        await Task.Run(() =>
-        {
-            lock (_waitingObjectsMonitor)
-            {
-                while (current == _executionCount)
-                {
-                    Monitor.Wait(this._waitingObjectsMonitor);
-                }
-            }
-        }
-         );
+        await AsyncMonitor.WaitAsync(this._waitingObjectsMonitor);
     }
 
 
@@ -320,11 +297,8 @@ public class Defer : IDisposable
                 {
                     this._exec(this._CurrentCancellation!.Token);
                     _executionCount++;
+                    AsyncMonitor.PulseAll(this._waitingObjectsMonitor);
 
-                    lock (this._waitingObjectsMonitor)
-                    {
-                        Monitor.PulseAll(this._waitingObjectsMonitor);
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -344,11 +318,10 @@ public class Defer : IDisposable
             sleepFor = (Math.Max(sleepFor, 1));
             _signal.Wait(TimeSpan.FromMilliseconds(sleepFor));
         }
+
         // we are shutting down
-        lock (this._waitingObjectsMonitor)
-        {
-            Monitor.PulseAll(this._waitingObjectsMonitor);
-        }
+        AsyncMonitor.PulseAll(this._waitingObjectsMonitor);
+
     }
 
     /// <summary>
