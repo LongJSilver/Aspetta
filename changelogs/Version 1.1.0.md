@@ -1,0 +1,31 @@
+# Changelog - Version 1.1.0
+
+### New features
+
+- Every trigger now returns an awaitable execution value, `DeferredExecution`, for the run the call was assigned to: await it to wait for the outcome, check `IsCompleted`, or pass it around as a plain `Task` via `AsTask()` or the implicit conversion. The outcome is carried by the value: completed, the delegate's original exception on fault, or `TaskCanceledException` on cancellation. Triggers that coalesce into one run share a single value, no matter how long the burst lasts. `Trigger(...)`, `ExecuteNow()` and the new `Pending` property all return it; `Pending` observes the armed execution without contributing a trigger and completes immediately when nothing is pending.
+- Asynchronous delegates are supported on the default task-based worker via `ToExecute(Func<Task>)` and `ToExecute(Func<CancellationToken, Task>)`; while an async delegate runs, no thread is held at all. Registering an async lambda against a synchronous overload (async void) is rejected at build time instead of silently becoming an uncancelable fire-and-forget.
+- `WithErrorHandler(...)` registers a handler that observes faults from fire-and-forget triggers that nobody awaits; if the handler itself throws, the worker survives and the execution still faults with the delegate's original exception.
+- Debugger support: hovering a `Defer` shows a one-line summary (name, delegate, delay, live state such as `armed (3 triggers)`), and expanding it shows the registered delegate, the worker kind, the armed trigger count and the pending cycle's status. The new `Named(...)` builder option sets the display name (also readable at runtime as `Defer.Name`), and `Defer.WorkerThread` exposes the dedicated-thread worker.
+- `WithTriggerTracing()` records who opened the current execution cycle and who triggered last, shown in the debugger view — in any build, the Release-built NuGet package included. On a process you just attached the debugger to, a traced `Defer` created through the immediate window starts reporting provenance without recompiling or restarting the faulty runtime.
+- A `Defer` that becomes unreachable without being disposed is no longer leaked: its worker notices within about a second and shuts itself down, while a run already in flight always finishes.
+- Pause and cancel are first-class and fully documented: `Pause()` holds pending executions — a due cycle is consumed and resolves as canceled, a cycle still armed keeps its deadline, and a run already executing is never disturbed; `Resume()` releases the hold (an armed cycle keeps its moment, a pass consumed while paused re-arms fresh on the configured delay), while `Resume(interval)` re-anchors whatever the pause holds at now + interval. To guarantee a run after resuming regardless of what the pause holds, trigger just before resuming. `Cancel()` / `CancelPending()` / `CancelExecuting()` with `CancelType` cancel the pending cycle, the in-flight run through its token, or both — without disturbing each other.
+
+### Breaking changes from 1.0.1-beta
+
+- `Trigger(...)` returns `DeferredExecution` instead of `void`. The `Trigger(int)` and `Trigger(uint)` overloads are no longer instance methods but remain available as extension methods that forward to `Trigger(TimeSpan?)` — existing `Trigger(500)` call sites keep compiling; only the return type changed.
+- The old minimum-delay clamp is gone: a zero or negative interval now forces execution as soon as the worker can begin it (intervals truncate to whole milliseconds).
+- `TriggerAndWait`, `TriggerAndWaitAsync`, `ExecuteNowAndWait`, `ExecuteNowAndWaitAsync`, `WaitForNextExecution` and `WaitForNextExecutionAsync` moved from instance methods to extension methods on `Defer` — the call syntax is unchanged. They now surface the execution's outcome directly (the original exception, or `TaskCanceledException`) without an `AggregateException` wrapper, and `TriggerAndWait()` without an interval uses the configured delay.
+- The builder was split by worker kind: `UsingTask(...)` returns a `TaskDeferBuilder`, `UsingDedicatedThread()` returns a `ThreadDeferBuilder`. Asynchronous delegates exist only on the task side; handing one to the dedicated-thread side is rejected at build time.
+- `UsingTask()` without a factory no longer captures an ambient custom scheduler; the worker loop is pinned to `TaskScheduler.Default` unless you pass a `TaskFactory`.
+- `MaximumDelaySpan` and `MaximumTriggerLimit` on a built `Defer` are now getters only; configure them on the builder.
+- Packaging: building no longer produces packages, and no prerelease suffix is baked into the project. Release packages are produced by an explicit publish step with the label chosen at pack time, so accidental Debug builds can no longer emit `-debug` packages that shadow the real prerelease on nuget.org.
+
+### Fixed
+
+- `Dispose` called from inside the delegate — including from await continuations or tasks spawned by it — is detected and no longer deadlocks waiting on itself.
+- `Dispose` called from inside a cancellation callback of the run's token is detected like a self-dispose and no longer deadlocks.
+- `Dispose` now always waits for the in-flight delegate to return, even when a callback registered on the run's token throws during the cancel; the callback's exception still surfaces on the `Dispose` caller afterwards.
+- A due execution can no longer start after `Dispose` (previously it could run on a disposed instance with an uncanceled token and resolve as completed); it now resolves as canceled.
+- A `Dispose` of one Defer issued from inside another Defer's cancellation callback now waits for that other Defer to finish, instead of returning while its delegate was still running.
+- A cancel issued while a run is executing still notifies the callbacks registered on that run's token even when the run finishes first; once that run is over, a late cancel on it is a no-op.
+- Cancellation outcomes follow what the delegate actually threw: an `OperationCanceledException` attributable to the canceled run — thrown on its token, or without naming any token — resolves the execution as canceled; one blaming an unrelated token resolves as faulted and is reported to the error handler; and a delegate that observes the cancellation and returns normally resolves as completed.

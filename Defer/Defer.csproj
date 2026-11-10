@@ -1,58 +1,69 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
-    <LangVersion>10.0</LangVersion>
-    <Nullable>enable</Nullable>
-    <AssemblyName>Aspetta</AssemblyName>
-    <BaseVersion>1.0.1-beta</BaseVersion>
-    <DefaultNamespace>Some.Restraint</DefaultNamespace>
-  </PropertyGroup>
+    <PropertyGroup>
+        <TargetFramework>netstandard2.0</TargetFramework>
+        <LangVersion>10.0</LangVersion>
+        <Nullable>enable</Nullable>
+        <AssemblyName>Aspetta</AssemblyName>
+        <!-- Packages are emitted only through the publish route, with the prerelease label
+             chosen at pack time, e.g.
+                 dotnet pack Defer/Defer.csproj -c Release                       (stable X.Y.Z)
+                 dotnet pack Defer/Defer.csproj -c Release -p:VersionSuffix=beta  (X.Y.Z-beta)
+                 dotnet pack Defer/Defer.csproj -c Release -p:VersionSuffix=alpha (X.Y.Z-alpha)
+             then pushed with the nuget-publish route (dotnet nuget push ...).
+             Pass an explicit suffix on Debug packs too, so a trigger-tracing build
+             never masquerades as the stable version. -->
+        <VersionPrefix>1.1.0</VersionPrefix>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <None Include="..\Icon.png">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-    <None Include="..\README.md">
-      <Pack>True</Pack>
-      <PackagePath>\</PackagePath>
-    </None>
-  </ItemGroup>
+    <ItemGroup>
+        <None Include="..\Icon.png">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+        <None Include="..\README.md">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+    </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.0" PrivateAssets="All" />
-  </ItemGroup>
-  
-  <PropertyGroup>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageId>Aspetta</PackageId>
-    <Version>$(BaseVersion)</Version>
-    <Authors>Marco Perna</Authors>
-    <Description>A minimal .NET micro-library for debouncing and coalescing frequent triggers</Description>
-    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <IncludeSource>true</IncludeSource>
-    <IncludeSymbols>true</IncludeSymbols>
-    <EmbedUntrackedSources>true</EmbedUntrackedSources>
-    <RepositoryUrl>https://github.com/LongJSilver/Aspetta</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
-    <PublishRepositoryUrl> true </PublishRepositoryUrl>
-    
-    <Company />
-    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
-    <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
-    <EnableNETAnalyzers>True</EnableNETAnalyzers>
-    <AnalysisLevel>latest-recommended</AnalysisLevel>
-    <Deterministic>true</Deterministic>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageProjectUrl>https://github.com/LongJSilver/Aspetta</PackageProjectUrl>
-    <PackageIcon>Icon.png</PackageIcon>
-  </PropertyGroup>
-  
-  <!-- Add a conditional property for Debug builds -->
-  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
-    <Version>$(BaseVersion)-debug</Version>
-  </PropertyGroup>
-  
+    <ItemGroup>
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All"/>
+    </ItemGroup>
+
+    <!-- The test assembly reaches the internals (DeferCore and its state) directly
+         instead of reflecting on private member names: compile-checked, refactor-safe.
+         Deliberately unkeyed: strong-name-keying the friend (the stricter form) is
+         blocked on this toolchain, whose OpenSSL policy rejects the SHA-1 digest the
+         strong-name format mandates. The README states the surface stance instead:
+         internals are not API, and are reachable through reflection by any full-trust
+         caller regardless of this declaration. -->
+    <ItemGroup>
+        <InternalsVisibleTo Include="Aspetta.Tests"/>
+    </ItemGroup>
+
+    <PropertyGroup>
+        <PackageId>Aspetta</PackageId>
+        <Authors>Marco Perna</Authors>
+        <Description>Debounce and coalesce frequent triggers in .NET. A burst of triggers runs your delegate once, and every trigger returns an awaitable that carries the outcome (completed, faulted or canceled). Works with sync and async delegates, with optional maximum delay and trigger limits, pause and cancel. No dependencies, .NET Standard 2.0.</Description>
+        <PackageTags>debounce debouncer debouncing throttle coalesce delay deferred timer async cancellation batching netstandard</PackageTags>
+        <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+        <IncludeSource>true</IncludeSource>
+        <IncludeSymbols>true</IncludeSymbols>
+        <EmbedUntrackedSources>true</EmbedUntrackedSources>
+        <RepositoryUrl>https://github.com/LongJSilver/Aspetta</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PublishRepositoryUrl>true</PublishRepositoryUrl>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+        <EnableNETAnalyzers>True</EnableNETAnalyzers>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <Deterministic>true</Deterministic>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageProjectUrl>https://github.com/LongJSilver/Aspetta</PackageProjectUrl>
+        <PackageIcon>Icon.png</PackageIcon>
+
+    </PropertyGroup>
+
 </Project>

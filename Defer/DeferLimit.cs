@@ -2,26 +2,32 @@
 
 namespace Some.Restraint;
 
-[Flags()]
+/// <summary>
+///     Which limits a <see cref="Defer" /> was configured with: none, a maximum delay
+///     span, a maximum trigger count, or both.
+/// </summary>
+[Flags]
 public enum DeferLimit
 {
     /// <summary>
-    /// Allow the delegate execution to be delayed only for a fixed amount of milliseconds (specified by the <see cref="Defer.MaximumDelaySpan"/> property)
-    /// AND ALSO for a fixed amount of times (specified by the <see cref="Defer.MaximumTriggerLimit"/> property), 
-    /// whichever occurs first.
+    ///     No limit is applied.
     /// </summary>
-    SpanAndCount = 3,
+    NoLimit = 0,
     /// <summary>
-    /// Only allow the delegate execution to be delayed a fixed amount of milliseconds (specified by the <see cref="Defer.MaximumDelaySpan"/> property)
-    /// </summary>
-    Span = 2,
-    /// <summary>
-    /// Only allow the delegate execution to be delayed a fixed amount of TIMES (specified by the <see cref="Defer.MaximumTriggerLimit"/> property)
+    ///     The execution is delayed by at most
+    ///     <see cref="Defer.MaximumTriggerLimit" /> triggers.
     /// </summary>
     Count = 1,
     /// <summary>
-    /// No limit is applied
+    ///     The execution is delayed by at most the span of
+    ///     <see cref="Defer.MaximumDelaySpan" />.
     /// </summary>
-    NoLimit = 0
-}
+    Span = 2,
+    /// <summary>
+    ///     Both limits active: the execution is delayed by at most the span of
+    ///     <see cref="Defer.MaximumDelaySpan" /> and at most
+    ///     <see cref="Defer.MaximumTriggerLimit" /> triggers, whichever occurs first.
+    /// </summary>
+    SpanAndCount = 3
 
+}
